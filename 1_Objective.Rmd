@@ -1,0 +1,363 @@
+---
+title: "The Ta-Feng Dataset"
+author: "<e5><8d><9b>, 銝剖控憭批飛 蝞∠<90>飛銵<a0>弦銝剖<bf><83>"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+<br>
+
+### 資料彙整流程
+
+<center>
+
+![Fig-1: Pata Preparation](fig/aggregation.jpg)
+
+</center>
+
+<hr>
+
+### 1. 交易項目計錄：`Z`
+
+```{r echo=T, message=F, cache=F, warning=F}
+rm(list=ls(all=T))
+Sys.setlocale("LC_ALL","C")
+library(dplyr)
+library(ggplot2)
+library(caTools)
+library(plotly)
+```
+
+##### 1.1 The `do.call-rbind-lapply` Combo
+```{r}
+library(readr)
+ta_feng_all_months_merged <- read_csv("ta_feng_all_months_merged.csv")
+View(ta_feng_all_months_merged)
+Z = ta_feng_all_months_merged %>% 
+  setNames(c("date","cust","age","area","cat","prod","qty","cost","price"))
+nrow(Z)
+```
+
+##### Data Convresion
+```{r}
+Z$date = Z$date %>% as.Date("%m/%d/%Y")
+summary(Z)
+```
+
+##### Quantile of Variables
+```{r}
+sapply(Z[,7:9], quantile, prob=c(.99, .999, .9995))
+```
+
+##### Get rid of Outliers
+```{r}
+Z = subset(Z, qty<=24 & cost<=3800 & price<=4000) 
+nrow(Z)  
+```
+
+##### Assign Transaction ID
+```{r}
+Z$tid = group_indices(Z, date, cust)
+```
+
+##### No. Customers, Categories, Product Items & Transactions
+```{r}
+sapply(Z[,c("cust","cat","prod","tid")], n_distinct)
+```
+
+##### Summary of Item Records
+```{r}
+summary(Z)
+```
+<br><hr>
+
+
+
+### 2. 交易計錄：`X`
+
+##### 交易資料彙整
+```{r}
+X = group_by(Z, tid) %>% summarise(
+  date = first(date),  # 交易日期
+  cust = first(cust),  # 顧客 ID
+  age = first(age),    # 顧客 年齡級別
+  area = first(area),  # 顧客 居住區別
+  items = n(),                # 交易項目(總)數
+  pieces = sum(qty),          # 產品(總)件數
+  total = sum(price),         # 交易(總)金額
+  gross = sum(price - cost)   # 毛利
+  ) %>% data.frame  # 119422
+```
+
+##### 交易摘要
+```{r}
+summary(X)    
+```
+
+##### Check Quantile & Remove Outliers
+```{r}
+sapply(X[,6:9], quantile, prob=c(.999, .9995, .9999))
+```
+
+```{r}
+X = subset(X, items<=62 & pieces<95 & total<16000) # 119328
+```
+
+##### Weekly Transactions
+```{r fig.height=3, fig.width=7}
+par(cex=0.8)
+hist(X$date, "weeks", freq=T, border='lightgray', col='darkcyan', 
+     las=2, main="No. Transaction per Week")
+```
+<br><hr>
+
+
+
+### 3. 顧客資料：`A`
+
+##### 顧客資料彙整
+```{r}
+d0 = max(X$date)
+A = group_by(X, cust) %>% summarise(
+  r = 1 + as.integer(difftime(d0, max(date), units="days")), # recency
+  s = 1 + as.integer(difftime(d0, min(date), units="days")), # seniority
+  f = n(),            # frquency
+  m = mean(total),    # monetary
+  rev = sum(total),   # total revenue contribution
+  raw = sum(gross),   # total gross profit contribution
+  age = first(age),   # age group
+  area = first(area), # area code
+  ) %>% data.frame    # 33241
+```
+
+##### 顧客摘要
+```{r}
+summary(A) 
+```
+
+```{r fig.height=8}
+par(mfrow=c(3,2), mar=c(3,3,4,2))
+for(x in c('r','s','f','m')) 
+  hist(A[,x],freq=T,main=x,xlab="",ylab="",cex.main=2)
+hist(pmin(A$f,10),0:10,freq=T,xlab="",ylab="",cex.main=2)
+hist(log(A$m,10),freq=T,xlab="",ylab="",cex.main=2)
+```
+
+##### Dupliate & Save
+```{r}
+A0 = A; X0 = X; Z0 = Z
+#save(Z0, X0, A0, file="data/tf0.rdata")
+```
+<br><hr>
+
+
+
+###The Demarcation Date
+###Remove data after the demarcation date
+```{r}
+feb01 = as.Date("2001-02-01")
+Z = subset(Z0, date < feb01)  
+```
+
+
+###Aggregate for the Transaction Records
+```{r}
+X = group_by(Z, tid) %>% summarise(
+  date = first(date),  # 交易日期
+  cust = first(cust),  # 顧客 ID
+  age = first(age),    # 顧客 年齡級別
+  area = first(area),  # 顧客 居住區別
+  items = n(),                # 交易項目(總)數
+  pieces = sum(qty),          # 產品(總)件數
+  total = sum(price),         # 交易(總)金額
+  gross = sum(price - cost)   # 毛利
+  ) %>% data.frame  # 88387
+summary(X)
+```
+
+###Check Quantile and Remove Outlier
+```{r}
+sapply(X[,6:9], quantile, prob=c(.999, .9995, .9999))
+X = subset(X, items<=64 & pieces<=98 & total<=11260) # 88387 -> 88295
+```
+
+
+###Aggregate for Customer Records
+```{r}
+d0 = max(X$date)
+A = group_by(X, cust) %>% summarise(
+  r = 1 + as.integer(difftime(d0, max(date), units="days")), # recency
+  s = 1 + as.integer(difftime(d0, min(date), units="days")), # seniority
+  f = n(),            # frquency
+  m = mean(total),    # monetary
+  rev = sum(total),   # total revenue contribution
+  raw = sum(gross),   # total gross profit contribution
+  age = first(age),   # age group
+  area = first(area), # area code
+  ) %>% data.frame    # 28584
+```
+
+
+###Aggregate Feb’s Transaction by Customer
+```{r}
+feb = filter(X0, date>= feb01) %>% group_by(cust) %>% 
+  summarise(amount = sum(total))  # 16899
+```
+
+###Preparing the Target Variables (Y)
+```{r}
+A = merge(A, feb, by="cust", all.x=T)  #The Target for Regression 
+A$buy = !is.na(A$amount)  #The Target for Classification 
+summary(A)
+```
+###The Association of Categorial Predictors
+```{r}
+tapply(A$buy, A$age, mean) %>% barplot
+abline(h = mean(A$buy), col='red')
+```
+
+```{r}
+tapply(A$buy, A$area, mean) %>% barplot
+abline(h = mean(A$buy), col='red')
+```
+
+###Contest Dataset
+```{r}
+X = subset(X, cust %in% A$cust & date < as.Date("2001-02-01"))
+Z = subset(Z, cust %in% A$cust & date < as.Date("2001-02-01"))
+set.seed(2018); spl = sample.split(A$buy, SplitRatio=0.7)
+c(nrow(A), sum(spl), sum(!spl))
+
+A2 = subset(A, buy) %>% mutate_at(c("m","rev","amount"), log10)
+n = nrow(A2)
+set.seed(2018); spl2 = 1:n %in% sample(1:n, round(0.7*n))
+c(nrow(A2), sum(spl2), sum(!spl2))
+
+cbind(A2, spl2) %>% 
+  ggplot(aes(x=amount)) + geom_density(aes(fill=spl2), alpha=0.5)
+```
+
+##cluster
+```{r}
+set.seed(1111)
+A$buy<- as.numeric(A$buy)
+A$grp = kmeans(scale(A[,c(2:7,11)]),8)$cluster
+table(A$grp)
+G <- group_by(A, grp) %>% summarise(
+  recent=mean(r), 
+  freq=mean(f),
+  varfreq=var(f),
+  money=mean(m),
+  varmn=var(m),
+  size=n()) %>% 
+  mutate(revenue = size*money/1000 )  %>% 
+  filter(size > 1) 
+g <- ggplot(G,aes(x=freq, y=money)) +
+  geom_point(aes(size=revenue, col=recent),alpha=0.5) +
+  scale_size(range=c(4,30)) +
+  scale_color_gradient(low="green",high="red") +
+  scale_x_log10() + scale_y_log10(limits=c(30,3000)) + 
+  geom_text(aes(label = recent ),size=3) +
+  theme_bw() + guides(size=F) +
+  labs(title="Customer Segements in 8 groups",
+       subtitle="(bubble_size:revenue_contribution; text:group_size)",
+       color="Recency") +
+  xlab("Frequency ") + ylab("Average Transaction Amount in log")
+ggplotly(g)
+```
+#顾客产品资讯
+```{r}
+packages = c(
+  "dplyr","ggplot2","googleVis","devtools","magrittr","slam","irlba","plotly",
+  "arules","arulesViz","Matrix","recommenderlab")
+existing = as.character(installed.packages()[,1])
+for(pkg in packages[!(packages %in% existing)]) install.packages(pkg)
+rm(list=ls(all=TRUE))
+LOAD = TRUE
+library(dplyr)
+library(ggplot2)
+library(googleVis)
+library(Matrix)
+library(slam)
+library(irlba)
+library(plotly)
+library(arules)
+#library(arulesViz)
+library(recommenderlab)
+```
+
+```{r}
+
+
+```
+
+
+<br><br><br><br><hr><br><br><br>
+
+<style>
+
+.caption {
+  color: #777;
+  margin-top: 10px;
+}
+p code {
+  white-space: inherit;
+}
+pre {
+  word-break: normal;
+  word-wrap: normal;
+  line-height: 1;
+}
+pre code {
+  white-space: inherit;
+}
+p,li {
+  font-family: "Trebuchet MS", "微軟正黑體", "Microsoft JhengHei";
+}
+
+.r{
+  line-height: 1.2;
+}
+
+.qiz {
+  line-height: 1.75;
+  background: #f0f0f0;
+  border-left: 12px solid #ccffcc;
+  padding: 4px;
+  padding-left: 10px;
+  color: #009900;
+}
+
+title{
+  color: #cc0000;
+  font-family: "Trebuchet MS", "微軟正黑體", "Microsoft JhengHei";
+}
+
+body{
+  font-family: "Trebuchet MS", "微軟正黑體", "Microsoft JhengHei";
+}
+
+h1,h2,h3,h4,h5{
+  color: #0066ff;
+  font-family: "Trebuchet MS", "微軟正黑體", "Microsoft JhengHei";
+}
+
+
+h3{
+  color: #008800;
+  background: #e6ffe6;
+  line-height: 2;
+  font-weight: bold;
+}
+
+h5{
+  color: #006000;
+  background: #f8f8f8;
+  line-height: 1.5;
+  font-weight: bold;
+}
+
+</style>
+
