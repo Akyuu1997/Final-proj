@@ -1,3 +1,8 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
 #this R code is designed to analysis the relation between goods 
 #and attempted to recommand goods based on the goods purchased by customers
 #1.Packages Import
@@ -13,7 +18,9 @@ packages = c(
   "arules","arulesViz","Matrix","recommenderlab")
 existing = as.character(installed.packages()[,1])
 for(pkg in packages[!(packages %in% existing)]) install.packages(pkg)
+```
 
+```{r}
 #library packages
 rm(list=ls(all=TRUE))
 LOAD = TRUE
@@ -25,15 +32,18 @@ library(slam)
 library(irlba)
 library(plotly)
 library(arules)
-library(arulesViz)
+#library(arulesViz)
 library(recommenderlab)
 
 #import data 
-load("data/tf0.rdata")
+load("~/GitHub/Final-proj/tf0.rdata")
 A = A0; X = X0; Z = Z0; rm(A0,X0,Z0); gc()
+```
+
 
 #3.Data Cluster
 #make customer product matrixs
+```{r}
 Z = subset(Z, cust %in% A$cust)
 n_distinct(Z$cust)  # 32241
 n_distinct(Z$prod)  # 23787
@@ -41,27 +51,35 @@ library(Matrix)
 library(slam)
 cpm = xtabs(~ cust + prod, Z, sparse=T)  # customer product matrix
 dim(cpm)             # 32241 23787
+```
 
+```{r}
 #delete the products cpm less than 6
 cpm = cpm[, colSums(cpm) >= 6]      # remove the least frequent products
 # cpm = cpm[rowSums(cpm) > 0, ]     # remove non-buying customers
 cpm = cpm[, order(-colSums(cpm))]   # order product by frequency
 dim(cpm)                            # 32241 23787>14621
 # table(cpm@x) %>% prop.table %>% round(4) %>% head(10) 
+```
 
+```{r}
 #summarize customers by usual products
 nop= 400  # no. product = no. variables 
 k = 200   # no. cluster
 set.seed(111); 
 kg = kmeans(cpm[,1:nop], k)$cluster
 table(kg) %>% as.vector %>% sort    
+```
 
+```{r}
 #joint group summary into customer dataframe
 df = A %>% inner_join(data.frame(
   cust = as.integer(rownames(cpm)), 
   kg) )
 head(df)  # 32241
+```
 
+```{r}
 #compute average feature
 df = data.frame(
   aggregate(. ~ kg, df[,c(2:7,10)], mean), # averages
@@ -69,7 +87,9 @@ df = data.frame(
   dummy = 2001                   # dummy column for googleViz
   )
 head(df)
+```
 
+```{r}
 #inactive bubble plot
 library(googleVis)
 op <- options(gvis.plot.tag='chart')
@@ -79,7 +99,9 @@ plot( gvisMotionChart(
   "kg", "dummy", options=list(width=800, height=600) ) )
 ## Set options back to original options
 ## options(op)
+```
 
+```{r}
 # use global variables: cpm, kg
 Sig = function(gx, P=1000, H=10) {
   print(sprintf("Group %d: No. Customers = %d", gx, sum(kg==gx)))
@@ -94,12 +116,11 @@ Sig = function(gx, P=1000, H=10) {
     ) %>% arrange(desc(lift)) %>% head(H)
   }
   Sig(130)
+```
 
+```{r}
 #feature engineer for customer(products) 
 library(irlba)
-if(LOAD) {
-  load("data/svd2a.rdata")
-} else {
   smx = cpm
   smx@x = pmin(smx@x, 2)            # cap at 2, similar to normalization  
   t0 = Sys.time()
@@ -107,9 +128,10 @@ if(LOAD) {
               nv=400,               # length of feature vector
               maxit=800, work=800)    
   print(Sys.time() - t0)            # 1.8795 mins
-  save(svd, file = "data/svd2a.rdata")
-}
+  #save(svd, file = "data/svd2a.rdata")
+```
 
+```{r}
 #group by feature vector
 set.seed(111); kg = kmeans(svd$u, 200)$cluster
 table(kg) %>% as.vector %>% sort
@@ -128,13 +150,18 @@ df = inner_join(A, data.frame(
   mutate(dummy = 2001, kg = sprintf("G%03d",kg)) %>% 
   data.frame
   ## Joining, by = "cust"
+```
 
+```{r}
 # Google Motion Chart
 plot( gvisMotionChart(
   subset(df, group_size >= 20 & group_size <= 1200),     
   "kg", "dummy", options=list(width=800, height=600) ) )
+```
 
 #4.Baskets Analysis
+
+```{r}
 n_distinct(Z$tid)  #119407
 n_distinct(Z$prod) #23787
 library(arules)    #library 
@@ -158,8 +185,11 @@ r1 = subset(rules, subset = rhs %in% c("93362993"))
 plot(r1,method="graph",engine="htmlwidget",itemCol="cyan") 
 #the size of bubble stands for probility of A purchased
 #the color of bubble stands for B probility increasing when A purchased
+```
+
 
 #5.Product Recommendation
+```{r}
 library(recommenderlab)
 rx = cpm[, colSums(cpm > 0) >= 50]
 rx = rx[rowSums(rx > 0) >= 20 & rowSums(rx > 0) <= 300, ]
@@ -171,12 +201,41 @@ bx = binarize(rx, minRating=1)   # binaryRatingMatrix
 rUBCF = Recommender(bx[1:8800,], method = "UBCF")   #UBCF：User Based Collaborative Filtering
 pred = predict(rUBCF, bx[8801:8846,], n=4)          #
 do.call(rbind, as(pred, "list")) %>% head(15)
+```
 
-if(LOAD) {
-  load("data/recommenders.rdata")
-} else{
-  rIBCF <- Recommender(bx[1:6000,], method = "IBCF") #IBCF：Item Based Collaborative Filtering
-}
+```{r}
+rIBCF <- Recommender(bx[1:6000,], method = "IBCF") #IBCF：Item Based Collaborative Filtering
 pred = predict(rIBCF, bx[8801:8846,], n=4)
 do.call(rbind, as(pred, "list")) %>% head(15)
-save(rIBCF, rUBCF, file="data/recommenders.rdata")  
+```
+
+```{r}
+set.seed(4321)
+scheme = evaluationScheme(     
+  bx, method="split", train = .75,  given=5)
+algorithms = list(            
+  AR53 = list(name="AR", param=list(support=0.0005, confidence=0.3)),
+  AR43 = list(name="AR", param=list(support=0.0004, confidence=0.3)),
+  RANDOM = list(name="RANDOM", param=NULL),
+  POPULAR = list(name="POPULAR", param=NULL),
+  UBCF = list(name="UBCF", param=NULL),
+  IBCF = list(name="IBCF", param=NULL) )
+t0 = Sys.time()
+results = evaluate(            
+    scheme, algorithms, 
+    type="topNList",     # method of evaluation
+    n=c(5, 10, 15, 20)   # no. recom. to be evaluated
+    )
+print(Sys.time() - t0)
+```
+
+```{r}
+# load("data/results.rdata")
+par(mar=c(4,4,3,2),cex=0.8)
+cols = c("red", "magenta", "gray", "orange", "blue", "green")
+plot(results, annotate=c(1,3), legend="topleft", pch=19, lwd=2, col=cols)
+abline(v=seq(0,0.006,0.001), h=seq(0,0.08,0.01), col='lightgray', lty=2)
+getConfusionMatrix(results$IBCF)
+```
+
+
