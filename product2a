@@ -1,10 +1,12 @@
 #this R code is designed to analysis the relation between goods 
 #and attempted to recommand goods based on the goods purchased by customers
-#1.packages import
+#1.Packages Import
 #2.matrixs about goods and customers
-#3.summarise customers group
-#4.basket analysis
+#3.Data Cluster
+#4.Basket Analysis
+#5.Product Recommendation
 
+#1.Packages Import
 #import packages
 packages = c(
   "dplyr","ggplot2","googleVis","devtools","magrittr","slam","irlba","plotly",
@@ -30,6 +32,7 @@ library(recommenderlab)
 load("data/tf0.rdata")
 A = A0; X = X0; Z = Z0; rm(A0,X0,Z0); gc()
 
+#3.Data Cluster
 #make customer product matrixs
 Z = subset(Z, cust %in% A$cust)
 n_distinct(Z$cust)  # 32241
@@ -131,7 +134,7 @@ plot( gvisMotionChart(
   subset(df, group_size >= 20 & group_size <= 1200),     
   "kg", "dummy", options=list(width=800, height=600) ) )
 
-#Baskets Analysis
+#4.Baskets Analysis
 n_distinct(Z$tid)  #119407
 n_distinct(Z$prod) #23787
 library(arules)    #library 
@@ -153,3 +156,27 @@ plot(rules,method="matrix",shading="lift",engine="htmlwidget",
 
 r1 = subset(rules, subset = rhs %in% c("93362993"))
 plot(r1,method="graph",engine="htmlwidget",itemCol="cyan") 
+#the size of bubble stands for probility of A purchased
+#the color of bubble stands for B probility increasing when A purchased
+
+#5.Product Recommendation
+library(recommenderlab)
+rx = cpm[, colSums(cpm > 0) >= 50]
+rx = rx[rowSums(rx > 0) >= 20 & rowSums(rx > 0) <= 300, ]
+dim(rx)  # 8846 3354
+
+rx = as(rx, "realRatingMatrix")  # realRatingMatrix
+bx = binarize(rx, minRating=1)   # binaryRatingMatrix
+
+rUBCF = Recommender(bx[1:8800,], method = "UBCF")   #UBCF：User Based Collaborative Filtering
+pred = predict(rUBCF, bx[8801:8846,], n=4)          #
+do.call(rbind, as(pred, "list")) %>% head(15)
+
+if(LOAD) {
+  load("data/recommenders.rdata")
+} else{
+  rIBCF <- Recommender(bx[1:6000,], method = "IBCF") #IBCF：Item Based Collaborative Filtering
+}
+pred = predict(rIBCF, bx[8801:8846,], n=4)
+do.call(rbind, as(pred, "list")) %>% head(15)
+save(rIBCF, rUBCF, file="data/recommenders.rdata")  
