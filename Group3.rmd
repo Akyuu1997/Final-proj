@@ -1,0 +1,120 @@
+---
+title: "效益模擬"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: united
+runtime: shiny
+---
+
+```{r}
+library(shiny); library(shinyWidgets);library(flexdashboard) 
+load("~/GitHub/Final-proj/tf-pro-rev.rdata")
+```
+
+
+Column Options {data-width=15%}
+-------------------------------------
+### Set1
+```{r}
+chooseSliderSkin("Nice")
+# h6("Set1")
+# 这边的range等待更改
+sliderInput("N1S1", "N1",  -5, 0, 0.25, 0.2) #后面以此为标准
+sliderInput("N2S1", "N2",  -5, 0, 0.25, 0.2) 
+sliderInput("N3S1", "N3",  -5, 0, 0.25, 0.2) 
+sliderInput("N4S1", "N4",  -5, 0, 0.25, 0.2)
+sliderInput("N5S1", "N5",  -5, 0, 0.25, 0.2) 
+sliderInput("N6S1", "N6",  -5, 0, 0.25, 0.2)
+sliderInput("N7S1", "N7",  -5, 0, 0.25, 0.2) 
+sliderInput("N8S1", "N8",  -5, 0, 0.25, 0.2)
+```
+
+Column Options {data-width=15%}
+-------------------------------------
+### Set2
+```{r}
+# h6("Set2")
+#这里的range也需要进行更改owo
+sliderInput("N1S2", "N1",   0, 50,  20,1) #后面以此为标准修改 
+sliderInput("N2S2", "N2",   0, 50,  20,1)
+sliderInput("N3S2", "N3",   0, 50,  20,1) 
+sliderInput("N4S2", "N4",   0, 50,  20,1)
+sliderInput("N5S2", "N5",   0, 50,  20,1) 
+sliderInput("N6S2", "N6",   0, 50,  20,1)
+sliderInput("N7S2", "N7",   0, 50,  20,1) 
+sliderInput("N8S2", "N8",   0, 50,  20,1)
+```
+
+
+Column {data-width=50%}
+-------------------------------------
+ 
+### Chart
+```{r}
+renderPlot({
+
+  S1=c( input$N1S1, input$N2S1, 
+        input$N3S1, input$N4S1,
+        input$N5S1, input$N6S1,
+        input$N7S1, input$N8S1
+    )
+  S2=c( input$N1S2, input$N2S2, 
+        input$N3S2, input$N4S2,
+        input$N5S2, input$N6S2,
+        input$N7S2, input$N8S2
+    )
+  s = c("N1","N2","N3","N4","N5","N6","N7","N8")
+  AS = as.character(s)
+  #S是八个status的数组,S1,S2也是对应的弹性系数
+  d = seq(0,1,0.01)     #d的座标
+  par(mar=c(4,4,2,1))   #大小
+
+ #样本画图，x和y的lim由轴决定
+  plot(1, 1, col='white', type='l', xlab='discount',
+       ylab='PI', main="Expected Payoff" ,
+       xlim=c(0,1))
+       #,ylim=input$Y4)
+       # 两个1是基本设定，后面才是aes的数据部分
+       # 加网格线，现在先不加好了
+       #  abline(v=seq（0,1,0.1),
+       #        h=seq(input$Y4[1],input$Y4[2],1),
+       #         col='lightgray',lty=3)
+
+#下面给出一个组的PI计算function
+  functionPI = function(d,Status,S1,MRG=0.3){
+    # load("C:/1/G/Final-proj-master/tf-pro-rev.rdata")
+    B0 = subset(B,B$Status==Status) #对该小组做分群研究
+    Buy = mean(B0$Buy)
+    Rev = sum(B0$Rev[B0$Rev<12000])  #去除inf的outlier
+    mean(((MRG+1)*(1-d)-1)*Rev*(1-d)*Buy*(1+S1*d)) #小组的PI
+    }
+
+  for(i in length(s)) {
+    PI = sapply(d, functionPI, Status=S[i], S1=S1[i])
+    nd = d[which.max(PI)]
+    AS[i] = sprintf("%s (%f, %f)",s[i],nd,max(PI))
+    lines(d, PI, col=i, lwd=2)       #曲线设定
+    points(nd, max(PI),col=i,pch=19)  #画出最高点
+    }
+  
+  #add legend 
+  legend("topright",AS,lty=1,col=1:length(s),lwd=2,
+         title=" Status, best discount rate, max value of PI")
+  })
+  
+  
+
+
+```
+
+### Chart
+```{r}
+
+```
+
+Column {data-width=20%}
+-------------------------------------
+```{r}
+
+```
+
