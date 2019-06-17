@@ -1,42 +1,30 @@
 rm(list=ls(all=T))
 options(digits=4, scipen=12)
 pacman::p_load(ggplot2, manipulate, dplyr, latex2exp)
-load("data/CX.rdata")
+load("~/GitHub/Final-proj/tf-pro-rev.rdata")
 
 #因为数据问题，假设获利率为0.3
 MRG = 0.5
 
 #设定R2为行销对象
-A = subset(CX, status=="R2")
-P0=A$ProbRetain
-R0=A$PredRevenue 
-
-#假设1：固定成本、固定回购几率
-cost = 5
-k1 = 0.75 # fix effect on the probability of retaintion
-par(mar=c(4,3,3,2), cex=0.8)
-PI = R0*MRG*(k1 - P0) - cost
-hist(PI, xlim=c(-50, 50), breaks=seq(-500,500,5),main="淨期望報償分布(R2)")
-
-#修正：行銷工具不應該會有負的回購機率效果
-par(mar=c(4,3,3,2), cex=0.8)
-PI = R0*MRG*pmax(0, k1 - P0) - cost
-hist(PI, xlim=c(-50, 50), breaks=seq(-500,500,5),main="淨期望報償分布(R2)")
+B0 = subset(B, status=="N2")
+P0=B$Buy
+R0=B$Rev 
 
 #假設二：固定成本、增加回購機率
 k2 = 0.15  # max. incremental effect of instrument
-cost = 5
+cost = 5   #
 par(mar=c(4,3,3,2), cex=0.8)
 PI = MRG * R0 * ifelse(P0<=(1-k2), k2, 1-P0) - cost
-hist(PI, xlim=c(-50, 50), breaks=seq(-500,500,5),main="淨期望報償分布(R2)")
+hist(PI,main="淨期望報償分布(R2)")
 
 #计算本行销工具在各个族群的效益
-CX = CX %>% mutate(
   PI = MRG*PredRevenue*ifelse(ProbRetain<=(1-k2), k2, 1-ProbRetain) - cost
+B = B %>% mutate(
+  PI = MRG*Rev*ifelse(Buy<=(1-k2), k2, 1-Buy) - cost
   ) 
-CX %>% group_by(status) %>% 
+B %>% group_by(Status) %>% 
   summarise(
-    Group.Sz = n(),
     No.Target = sum(PI>0),
     AvgROI = mean(PI[PI>0]),
     TotalROI = sum(PI[PI>0])) %>% 
@@ -46,16 +34,23 @@ CX %>% group_by(status) %>%
 
 #该工具的报偿分布
 par(mfrow=c(4,2), mar=c(4,3,3,2), cex=0.8)
-for(s in c("N1","N2","R1","R2","S1","S2","S3")) {
-  hist(CX$PI[CX$status==s], xlim=c(-5, 100), breaks=seq(-1000,1000,10), 
-       ylim=c(0, 800), main=s, xlab="exp.profit")
+for(s in c("N1","N2","N3","N4","N5","N6","N7","N8")) {
+  hist(B$PI[B$Status==s],main=s,xlim=c(-5,100),xlab="exp.profit",ylim=c(0,80000))
   abline(v=0, col='green', lty=2)}
-
+  
 #带有参数的模拟方式
-m=0.20; a=20; b=15
-curve(m*plogis((10/a)*(x-b)), 0, 30, lwd=2, ylim=c(0, 0.25),
-      main=TeX('$m \\cdot Logis(10(x - b)/a)$'), ylab="f(x)")
-abline(h=seq(0,0.2,0.05),v=seq(0,30,5),col='lightgrey',lty=2)
+S1=0.5; #回购几率弹性
+S2=1.2;
+d=0.2
+MGR = 0.3
+#MRG = (MGR+1)(1-d) - 1 
+#R   = R(1-d)
+#P   = P(1+S1*d)
+#Profit = 
+curve(((MGR+1)*(1-x)-1)*median(R0)*(1-x)*median(P0)*(1+S1*x),0,1, lwd=2,
+      ylim=c(-50, 50),main=TeX('PI'), ylab="f(x)"
+)
+#abline(h=seq(0,0.2,0.05),v=seq(0,30,5),col='lightgrey',lty=2)
 
 #利用manipulate进行模拟
 manipulate({
@@ -69,41 +64,21 @@ b = slider(   4,   20,    15, step=1)
 ) 
 
 #使用模拟方法找到最佳策略参数
-m=0.20; a=20; b=15
-do.call(rbind, lapply(seq(5,40,0.5), function(c){
-  p = m*plogis((10/a)*(c-b))
-  CX %>% mutate(
-    PI = ifelse(ProbRetain<=(1-p), p, 1-ProbRetain) * PredRevenue - c
-  ) %>%
-    group_by(status) %>% summarise(
-      Cost = c,
-      Group.Sz = n(),
-      No.Target = sum(PI>0),
-      AvgROI = mean(PI[PI>0]),
-      TotalROI = sum(PI[PI>0])
-    ) } ) ) %>% 
-  ggplot(aes(x=Cost, y=TotalROI, col=status)) +
-  geom_line(size=1.2) +
-  ggtitle("Cost Effeciency per Segment ")
-
+#不过这个出来还是一个群组的，没有分组的情景
+#但是至少这个函数我们可以掌握了
 manipulate({
-  do.call(rbind, lapply(seq(5,40,0.5), function(c){
-    p = m*plogis((10/a)*(c-b))
-    CX %>% mutate(
-      PI = ifelse(ProbRetain<=(1-p), p, 1-ProbRetain) * PredRevenue - c
+  do.call(rbind, lapply(seq(0,1,0.05), function(d){
+    B %>% mutate(
+      PI =  ((MRG+1)*(1-d)-1)*ifelse(Rev<12000,Rev,0)*(1-d)*Buy*(1+S1*d)
     ) %>%
-      group_by(status) %>% summarise(
-        Cost = c,
-        Group.Sz = n(),
-        No.Target = sum(PI>0),
-        AvgROI = mean(PI[PI>0]),
-        TotalROI = sum(PI[PI>0])
+      group_by(Status) %>% summarise(
+        Discount = d,
+        AvgROI = mean(PI),
+        TotalPI = sum(PI)
       ) } ) ) %>% 
-    ggplot(aes(x=Cost, y=TotalROI, col=status)) +
-    geom_line(size=1.2) +
-    ggtitle("Cost Effeciency per Segment ")
+    ggplot(aes(x=Discount, y=TotalPI), col=B$Status) +
+    geom_line(size=1.2)+
+    ggtitle("PI with discount ")
 },
-m = slider(0.05, 0.25,  0.20, step=0.01),
-a = slider(  10,   30,    20, step=1),
-b = slider(   4,   20,    15, step=1)
+S1 = slider(0.05, 0.50,  0.20, step=0.01)
 ) 

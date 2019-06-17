@@ -57,13 +57,13 @@ hr()
 h6("价格弹性设定")
 #这边的range等待更改
 sliderInput("N1S1", "N1",  -5, 0, 0.25，0.2) #后面以此为标准
-sliderInput("N2S1", "N2",  -5, 0, 0.25) 
-sliderInput("N3S1", "N3",  0, Inf,  20) 
-sliderInput("N4S1", "N4",  0, Inf,  20)
-sliderInput("N5S1", "N5",  0, Inf,  20) 
-sliderInput("N6S1", "N6",  0, Inf,  20)
-sliderInput("N7S1", "N7",  0, Inf,  20) 
-sliderInput("N8S1", "N8",  0, Inf,  20)
+sliderInput("N2S1", "N2",  -5, 0, 0.25，0.2) 
+sliderInput("N3S1", "N3",  -5, 0, 0.25，0.2) 
+sliderInput("N4S1", "N4",   -5, 0, 0.25，0.2)
+sliderInput("N5S1", "N5",   -5, 0, 0.25，0.2) 
+sliderInput("N6S1", "N6",   -5, 0, 0.25，0.2)
+sliderInput("N7S1", "N7",   -5, 0, 0.25，0.2) 
+sliderInput("N8S1", "N8",   -5, 0, 0.25，0.2)
 ```
 
 Column D2 {.sidebar data-width=200}
@@ -74,13 +74,13 @@ hr()
 h6("回购几率弹性设定")
 #这里的range也需要进行更改owo
 sliderInput("N1S2", "N1",   0, 50,  20,1) #后面以此为标准修改 
-sliderInput("N2S2", "N2", -50,  0, -40)
-sliderInput("N3S2", "N3", -50,  0, -30) 
-sliderInput("N4S2", "N4",   0, 50,   0)
-sliderInput("N5S2", "N5",   0, 50,  20) 
-sliderInput("N6S2", "N6", -50,  0, -40)
-sliderInput("N7S2", "N7", -50,  0, -30) 
-sliderInput("N8S2", "N8",   0, 50,   0)
+sliderInput("N2S2", "N2",   0, 50,  20,1)
+sliderInput("N3S2", "N3",   0, 50,  20,1) 
+sliderInput("N4S2", "N4",   0, 50,  20,1)
+sliderInput("N5S2", "N5",   0, 50,  20,1) 
+sliderInput("N6S2", "N6",   0, 50,  20,1)
+sliderInput("N7S2", "N7",   0, 50,  20,1) 
+sliderInput("N8S2", "N8",   0, 50,  20,1)
 ```
 
 Column D3 {data-width=500}
@@ -99,32 +99,39 @@ output$eRet = renderPlot({
         input$N5S2, input$N6S2,
         input$N7S2, input$N8S2
     )
-    #这是两个数组，包含不同群体的弹性信息，但是s2的应该更改一下
-  d = seq(0,100,1) #x的座标，这里改成d
-  par(mar=c(4,4,2,1))        #大小
+  S = c("N1","N2","N3","N4","N5","N6","N7","N8")
+  #S是八个status的数组,S1,S2也是对应的弹性系数
+  d = seq(0,1,0.01)     #d的座标
+  par(mar=c(4,4,2,1))   #大小
 
 #样本画图，x和y的lim由轴决定
   plot(1, 1, col='white', type='l', xlab='樣本大小',
        ylab='Revenue', main="期望報酬", 
        family="Microsoft JhengHei",
        xlim=input$X4,ylim=input$Y4)
-       #两个1是什么
-#加线
-  abline(v=seq(input$X4[1],input$X4[2],100),
+       #两个1是基本设定，后面才是aes的数据部分
+#加网格线
+  abline(v=seq（0,1,0.1),
          h=seq(input$Y4[1],input$Y4[2],1),
          col='lightgray',lty=3)
-#
-  for(i in 1:length(A)) {#ut检验的究竟是什么东西，跟我们做的有什么关系？？？
-    y = sapply(x, ut, d=input$D, a=A[i], c=input$C, pay=pay)
+
+#下面给出一个组的PI计算function
+functionPI = function(d,Status，S1，MRG=0.3){
+    load("~/GitHub/Final-proj/tf-pro-rev.rdata")
+    B = subset(B,Status=Status),#对该小组做分群研究
+    Rev = mean(Rev[Rev<12000]), #去除inf的outlier
+    PI =  mean(((MRG+1)*(1-d)-1)*Rev*(1-d)*Buy*(1+S1*d)) #小组的PI
+}
+  for(i in length(s)) {
+    y = sapply(d, functionPI, Status=S[i], S1=S1[i], S2=S2[i])
     nx = x[which.max(y)]
-    pwr = pwr.t.test(nx,input$D,A[i])$power #
-    AS[i] = sprintf("%.3f (%.3f, %d, %.3f)",A[i],pwr,nx,max(y))
-    lines(x, y, col=i, lwd=2)       #曲线设定
-    points(nx, max(y),col=i,pch=19) #最高点
+    AS[i] = sprintf("%.3f (%.3f, %d, %.3f)",s[i],nx,max(y))；
+    lines(d, PI, col=i, lwd=2)       #曲线设定
+    points(nx, max(y),col=i,pch=19)  #画出最高点
     }
-#
-  legend("topright",AS,lty=1,col=1:length(A),lwd=2,
-         title="  Sig.level (Power,  N,  Ut.)")
+#add legend 
+  legend("topright",AS,lty=1,col=1:length(s),lwd=2,
+         title=" Status, best discount rate, max value of PI")
   })
 
 ```
