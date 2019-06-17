@@ -10,11 +10,13 @@ output:
 #    favicon: nsysu48.png
 runtime: shiny
 ---
+#用RMD打开
 
 ```{r}
 library(shinyWidgets);library(flexdashboard); library(pwr);
 library(metRology); library(fitdistrplus); 
-library(ggpubr); library(lattice); library(gridExtra)
+library(ggpubr); library(lattice); library(gridExtra);
+library(shiny)
 
 K = 200000
 set.seed(2)
@@ -24,6 +26,7 @@ P = list( Normal = rnorm(K, 50, 10),  Uniform = runif(K, 0, 100),
           Beta2 = 100*rbeta(K, 2, 2), Beta.5 = 100*rbeta(K, .5, .5) )
 
 ```
+#上面这个是什么？
 
 分群方法{data-icon="fa-rocket"}
 #上面这个参数是什么东西？
@@ -35,10 +38,10 @@ Column A1 {.sidebar data-width=270}
 # {r child = 'Test/theory.Rmd'}
 #what's this?
 chooseSliderSkin("Nice")
-selectInput("规则分群", "族群年龄分布", choices=list(
-  "Normal" = 1, "Uniform" = 2, "Skew.Right" = 3, "Skew.Left" = 4,
-  "Tri.Right" = 5, "TriLeft" = 6, "Beta(2,2)" = 7, "Beta(.5,.5)" = 8
-  ), selected=1）
+#selectInput("规则分群", "族群年龄分布", choices=list(
+#  "Normal" = 1, "Uniform" = 2, "Skew.Right" = 3, "Skew.Left" = 4,
+#  "Tri.Right" = 5, "TriLeft" = 6, "Beta(2,2)" = 7, "Beta(.5,.5)" = 8
+#  ), selected=1）
 hr()
 ```
 
@@ -53,17 +56,16 @@ Column D1 {.sidebar data-width=200}
 -------------------------------------
 ```{r}
 # {r child = 'Test/simulate.Rmd'}
-hr()
 h6("价格弹性设定")
 #这边的range等待更改
-sliderInput("N1S1", "N1",  -5, 0, 0.25，0.2) #后面以此为标准
-sliderInput("N2S1", "N2",  -5, 0, 0.25，0.2) 
-sliderInput("N3S1", "N3",  -5, 0, 0.25，0.2) 
-sliderInput("N4S1", "N4",   -5, 0, 0.25，0.2)
-sliderInput("N5S1", "N5",   -5, 0, 0.25，0.2) 
-sliderInput("N6S1", "N6",   -5, 0, 0.25，0.2)
-sliderInput("N7S1", "N7",   -5, 0, 0.25，0.2) 
-sliderInput("N8S1", "N8",   -5, 0, 0.25，0.2)
+sliderInput("N1S1", "N1",  -5, 0, 0.25, 0.2) #后面以此为标准
+sliderInput("N2S1", "N2",  -5, 0, 0.25, 0.2) 
+sliderInput("N3S1", "N3",  -5, 0, 0.25, 0.2) 
+sliderInput("N4S1", "N4",  -5, 0, 0.25, 0.2)
+sliderInput("N5S1", "N5",  -5, 0, 0.25, 0.2) 
+sliderInput("N6S1", "N6",  -5, 0, 0.25, 0.2)
+sliderInput("N7S1", "N7",  -5, 0, 0.25, 0.2) 
+sliderInput("N8S1", "N8",  -5, 0, 0.25, 0.2)
 ```
 
 Column D2 {.sidebar data-width=200}
@@ -90,12 +92,12 @@ Column D3 {data-width=500}
 output$eRet = renderPlot({
 
   S1=c( input$N1S1, input$N2S1, 
-        input$N3S1, input$N4S1，
+        input$N3S1, input$N4S1,
         input$N5S1, input$N6S1,
         input$N7S1, input$N8S1
     )
   S2=c( input$N1S2, input$N2S2, 
-        input$N3S2, input$N4S2，
+        input$N3S2, input$N4S2,
         input$N5S2, input$N6S2,
         input$N7S2, input$N8S2
     )
@@ -110,24 +112,26 @@ output$eRet = renderPlot({
        family="Microsoft JhengHei",
        xlim=input$X4,ylim=input$Y4)
        #两个1是基本设定，后面才是aes的数据部分
-#加网格线
-  abline(v=seq（0,1,0.1),
-         h=seq(input$Y4[1],input$Y4[2],1),
-         col='lightgray',lty=3)
+#加网格线，现在先不加好了
+#  abline(v=seq（0,1,0.1),
+#        h=seq(input$Y4[1],input$Y4[2],1),
+#         col='lightgray',lty=3)
 
 #下面给出一个组的PI计算function
-functionPI = function(d,Status，S1，MRG=0.3){
+functionPI = function(d,Status,S1,MRG=0.3){
     load("~/GitHub/Final-proj/tf-pro-rev.rdata")
-    B = subset(B,Status=Status),#对该小组做分群研究
-    Rev = mean(Rev[Rev<12000]), #去除inf的outlier
-    PI =  mean(((MRG+1)*(1-d)-1)*Rev*(1-d)*Buy*(1+S1*d)) #小组的PI
+    B = subset(B,B$Status==Status) #对该小组做分群研究
+    Buy = mean(B$Buy)
+    Rev = sum(B$Rev[B$Rev<12000])  #去除inf的outlier
+    mean(((MRG+1)*(1-d)-1)*Rev*(1-d)*Buy*(1+S1*d)) #小组的PI
 }
+
   for(i in length(s)) {
-    y = sapply(d, functionPI, Status=S[i], S1=S1[i], S2=S2[i])
-    nx = x[which.max(y)]
-    AS[i] = sprintf("%.3f (%.3f, %d, %.3f)",s[i],nx,max(y))；
+    PI = sapply(d, functionPI, Status=S[i], S1=S1[i], S2=S2[i])
+    nd = d[which.max(y)]
+    AS[i] = sprintf("%.3f (%d, %.3f)",s[i],nd,max(y))；
     lines(d, PI, col=i, lwd=2)       #曲线设定
-    points(nx, max(y),col=i,pch=19)  #画出最高点
+    points(nd, max(y),col=i,pch=19)  #画出最高点
     }
 #add legend 
   legend("topright",AS,lty=1,col=1:length(s),lwd=2,
