@@ -12,9 +12,9 @@ load("~/GitHub/Final-proj/tf-pro-rev.rdata")
 ```
 
 
-Column Options {data-width=15%}
+Column Options {data-width=10%}
 -------------------------------------
-### Set1
+### 回购几率弹性
 ```{r}
 chooseSliderSkin("Nice")
 # h6("Set1")
@@ -29,9 +29,9 @@ sliderInput("N7S1", "N7",  -5, 0, 0.25, 0.2)
 sliderInput("N8S1", "N8",  -5, 0, 0.25, 0.2)
 ```
 
-Column Options {data-width=15%}
+Column Options {data-width=10%}
 -------------------------------------
-### Set2
+### 购买量弹性
 ```{r}
 # h6("Set2")
 #这里的range也需要进行更改owo
@@ -72,8 +72,7 @@ renderPlot({
  #样本画图，x和y的lim由轴决定
   plot(1, 1, col='white', type='l', xlab='discount',
        ylab='PI', main="Expected Payoff" ,
-       xlim=c(0,1))
-       #,ylim=input$Y4)
+       xlim=c(0,1),ylim=10**Input$Y1)
        # 两个1是基本设定，后面才是aes的数据部分
        # 加网格线，现在先不加好了
        #  abline(v=seq（0,1,0.1),
@@ -81,16 +80,16 @@ renderPlot({
        #         col='lightgray',lty=3)
 
 #下面给出一个组的PI计算function
-  functionPI = function(d,Status,S1,MRG=0.3){
+  functionPI = function(d,Status,S1,S2,MRG=Input$MRG){
     # load("C:/1/G/Final-proj-master/tf-pro-rev.rdata")
     B0 = subset(B,B$Status==Status) #对该小组做分群研究
     Buy = mean(B0$Buy)
     Rev = sum(B0$Rev[B0$Rev<12000])  #去除inf的outlier
-    mean(((MRG+1)*(1-d)-1)*Rev*(1-d)*Buy*(1+S1*d)) #小组的PI
+    ((MRG+1)*(1-d)-1)*Rev*(1-d)*max(Buy*(1+S1*d),1)*(1+S2*d) #小组的PI
     }
-
+  
   for(i in length(s)) {
-    PI = sapply(d, functionPI, Status=S[i], S1=S1[i])
+    PI = sapply(d, functionPI, Status=S[i], S1=S1[i],S2=S2[i])
     nd = d[which.max(PI)]
     AS[i] = sprintf("%s (%f, %f)",s[i],nd,max(PI))
     lines(d, PI, col=i, lwd=2)       #曲线设定
@@ -102,19 +101,63 @@ renderPlot({
          title=" Status, best discount rate, max value of PI")
   })
   
+### Chart2
+```{r}
+renderPlot({
+
+  S1=c( input$N1S1, input$N2S1, 
+        input$N3S1, input$N4S1,
+        input$N5S1, input$N6S1,
+        input$N7S1, input$N8S1
+    )
+  S2=c( input$N1S2, input$N2S2, 
+        input$N3S2, input$N4S2,
+        input$N5S2, input$N6S2,
+        input$N7S2, input$N8S2
+    )
+  s = c("N1","N2","N3","N4","N5","N6","N7","N8")
+  AS = as.character(s)
+  #S是八个status的数组,S1,S2也是对应的弹性系数
+  d = seq(0,1,0.01)     #d的座标
+  par(mar=c(4,4,2,1))   #大小
+
+ #样本画图，x和y的lim由轴决定
+  plot(1, 1, col='white', type='l', xlab='discount',
+       ylab='Rev', main="Rev-discount" ,
+       xlim=c(0,1),ylim=10**Input$Y2)
+       # 两个1是基本设定，后面才是aes的数据部分
+       # 加网格线，现在先不加好了
+       #  abline(v=seq（0,1,0.1),
+       #        h=seq(input$Y4[1],input$Y4[2],1),
+       #         col='lightgray',lty=3)
+
+  functionRev = function(d,Status,S1,S2,MRG=Input$MRG){
+    B0  = subset(B,B$Status==Status)
+    Buy = mean(B0$Buy)
+    Rev = sum(B0$Rev[B0$Rev<12000])#同上
+    Rev*(1-d)*max(Buy*(1+S1*d),1)*(1+S2*d)      #小组的Rev
+  }
+
+
+  for(i in length(s)) {
+    Rev = sapply(d, functionRev, Status=S[i], S1=S1[i],S2=S2[i])
+    nd = d[which.max(PI)]
+    AS[i] = sprintf("%s (%f, %f)",s[i],nd,max(Rev))
+    lines(d, Rev, col=i, lwd=2)       #曲线设定
+    points(nd, max(Rev),col=i,pch=19)  #画出最高点
+    }
   
-
-
+  #add legend 
+  legend("topright",AS,lty=1,col=1:length(s),lwd=2,
+         title=" Status, best discount rate, max value of Rev")
+  })
 ```
 
-### Chart
+### Chart3
 ```{r}
-
+inputPanel(
+    sliderInput("Y1", "Y軸", -6, 6, c(-6,7), 1),
+    sliderInput("Y2", "Y軸", 0, 2400, c(-5,8),1),
+    sliderInput("MRG", "MRG", 0, 3, 0.1, 0.3) 
+)
 ```
-
-Column {data-width=20%}
--------------------------------------
-```{r}
-
-```
-
