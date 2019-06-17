@@ -19,7 +19,6 @@ PI = MRG * R0 * ifelse(P0<=(1-k2), k2, 1-P0) - cost
 hist(PI,main="淨期望報償分布(R2)")
 
 #计算本行销工具在各个族群的效益
-  PI = MRG*PredRevenue*ifelse(ProbRetain<=(1-k2), k2, 1-ProbRetain) - cost
 B = B %>% mutate(
   PI = MRG*Rev*ifelse(Buy<=(1-k2), k2, 1-Buy) - cost
   ) 
